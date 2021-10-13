@@ -1,72 +1,80 @@
-import math
 import cv2
 import copy
 import os
-import sys
 import time
 import argparse
-import pandas as pd
 from obj_detector import ObjDetector
 from tracker import Tracker
 
-def calc_trajectory(track):
-    if len(track.trace) > 5:
-        x1 = track.trace[-5][0]
-        y1 = -track.trace[-5][1]
-        x2 = track.trace[-1][0]
-        y2 = -track.trace[-1][1]
-        dx = x2 - x1
-        dy = y2 - y1
-        return calc_angle(dx, dy)
-    return 0
-
-def calc_angle(dx, dy):
-    rads = math.atan2(dy, dx)
-    degs = math.degrees(rads)
-    adj = 360 - (degs - 90)
-    if adj >= 360:
-        return adj - 360
-    return adj        
-
-
-def find_objects(file, filename, outpath, showImages, writeImages, verbose):
+def find_objects(file, filename, outpath, showImages, writeImages, writeVideoFile, verbose):
     storeImages = True
-
+    
     print("Calling opencv VideoCapture with file: " + file)
     try:
         cap = cv2.VideoCapture(file)
         
-        detector = ObjDetector(showImages, 200)
-        tracker = Tracker(900, 10, 150, 100, storeImages, writeImages, filename, outpath)
+        width  = cap.get(3)   # float `width`
+        height = cap.get(4)  # float `height`
+    
+        print("width=" + str(width) + ", height=" + str(height))
+        #
+        if writeVideoFile:
+            writer = cv2.VideoWriter(os.path.join(outpath,"output.avi"), cv2.VideoWriter_fourcc(*"MJPG"), 10, (int(width),int(height)))
+        
+        detector = ObjDetector(showImages, writeVideoFile, 200, verbose)
+        tracker = Tracker(700, 5, 100, 100, storeImages, writeImages, filename, outpath)
         
         if showImages == True:
             cv2.namedWindow('image', cv2.WINDOW_NORMAL)
             cv2.resizeWindow('image', 1920, 1080)
+            cv2.namedWindow('thresh', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('thresh', 1920, 1080)
+            cv2.namedWindow('bgsub', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('bgsub', 1920, 1080)
+            cv2.namedWindow('contours', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('contours', 1920, 1080)
+
     
         count = 1
         # set this value if you want to start processing a video somewhere in the middle
-        start_frame = 0
+        start_frame_number = 0
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame_number)
         while cap.isOpened():
+            t1 = time.perf_counter()
             ret, frame = cap.read()
-            
+            t2 = time.perf_counter()
             if ret == False:
                 break
     
-            if count > start_frame:
+            print("frame: " + str(count))
+            if showImages | writeVideoFile:
                 orig_frame = copy.copy(frame)
+            else:
+                orig_frame = frame
+    
+            centers = detector.findObjects(frame, tracker)
+            tracker.updateTracks(centers, orig_frame, count)
         
-                centers = detector.findObjects(frame, tracker)
-                tracker.updateTracks(centers, orig_frame, count)
+            if verbose:
+                print("Time with frame read: " + str(time.perf_counter() - t1))
+                print("Time without read: " + str(time.perf_counter() - t2))
                 
-                if verbose:
-                    print('processed frame: ' + str(count) + ", num tracks = " + str(len(tracker.tracks)))
+            if writeVideoFile:
+                writer.write(frame)
+            
+            if verbose:
+                print('processed frame: ' + str(count) + ", num tracks = " + str(len(tracker.tracks)))
+                
             count += 1
 
     except cv2.error as error:
-        print("Error with video file: " + file + " - " + error)
+        print("Error with video file: " + file + " - " + str(error))
 
     cap.release()
-    cv2.destroyAllWindows()
+    if writeVideoFile:
+        writer.release()
+    if showImages:
+        cv2.destroyAllWindows()
     
 
 if __name__ == "__main__":
@@ -74,11 +82,11 @@ if __name__ == "__main__":
     parser.add_argument("video_file", help="The video file to process")
     parser.add_argument("output_dir", help="The path to the output folder to use if writing out moving object images")
     parser.add_argument("-show_video", action="store_true", help="Should the video be displayed while processing?")
+    parser.add_argument("-write_video", action="store_true", help="Should video output with detection boxes be written to disk?")
     parser.add_argument("-write_images", action="store_true", help="Should images of the moving objects be written to disk?")
     parser.add_argument("-v", action="store_true", help="Verbose - should more detail be written about progress?")
 
     args = parser.parse_args()
-
     full_path_video_file = args.video_file
     
     if not os.path.exists(full_path_video_file):
@@ -106,7 +114,7 @@ if __name__ == "__main__":
         if fileExt in [".mp4", ".MP4", ".MOD", "mod", ".MTS", ".mts", ".mkv"]:
             out_file.write("File valid, starting processing\n")
             out_file.flush()
-            find_objects(full_path_video_file, fileNameBase, outputDir, args.show_video, args.write_images, args.v)
+            find_objects(full_path_video_file, fileNameBase, outputDir, args.show_video, args.write_images, args.write_video, args.v)
             delta = time.time() - start
             out_file.write("Took: " + str(delta) + " seconds to process video\n")
             out_file.flush()
