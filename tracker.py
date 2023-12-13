@@ -671,7 +671,7 @@ class Tracker(object):
                     if self.tracks[i].write_initial_frames == True:
                         # then write out all previous images, but do only once
                         self.tracks[i].write_initial_frames = False
-                        prev_frame_num = frame_num - len(self.tracks[i].images)
+                        prev_frame_num = frame_num - len(self.tracks[i].images) - 1
                         for k in range(len(self.tracks[i].images)):
                             px, py = self.tracks[i].trace[k]
                             parea = self.tracks[i].areas[k]
