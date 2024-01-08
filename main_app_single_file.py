@@ -35,9 +35,9 @@ def find_objects(file, filename, outpath, showImages, writeImages, writeVideoFil
             cv2.resizeWindow('contours', 1920, 1080)
 
     
-        count = 1
+        count = 4022
         # set this value if you want to start processing a video somewhere in the middle
-        start_frame_number = 0
+        start_frame_number = 4022
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame_number)
         while cap.isOpened():
             t1 = time.perf_counter()
@@ -46,7 +46,10 @@ def find_objects(file, filename, outpath, showImages, writeImages, writeVideoFil
             if ret == False:
                 break
     
-            print("frame: " + str(count))
+            # print("frame: " + str(count))
+            if count in [12, 1031, 1032, 1040, 2340, 2414, 4022, 5036, 5429, 6265]:
+                print('frame: ' + str(count))
+
             if showImages | writeVideoFile:
                 orig_frame = copy.copy(frame)
             else:

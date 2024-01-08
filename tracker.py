@@ -138,7 +138,6 @@ class Tracker(object):
         if (width == 0) & (height == 0):
             return np.zeros([1, 1, 3], dtype=np.uint8)
 
-
         frameHeight = frame.shape[0]
         frameWidth = frame.shape[1]
 
@@ -671,7 +670,7 @@ class Tracker(object):
                     if self.tracks[i].write_initial_frames == True:
                         # then write out all previous images, but do only once
                         self.tracks[i].write_initial_frames = False
-                        prev_frame_num = frame_num - len(self.tracks[i].images) - 1
+                        prev_frame_num = frame_num - len(self.tracks[i].images)
                         for k in range(len(self.tracks[i].images)):
                             px, py = self.tracks[i].trace[k]
                             parea = self.tracks[i].areas[k]
@@ -680,13 +679,15 @@ class Tracker(object):
                             pvel_mag = np.sqrt(np.power(pspeed[0], 2) + np.power(pspeed[1], 2))
                             pvel_mag = self.tracks[i].distances[k]
                             # todo, figure out how to get frame_num of previous better
-                            self.writeImage(self.tracks[i].images[k], px, py, prev_frame_num, self.tracks[i].track_id, pvel_mag, parea, pux, puy, pbWidth, pbHeight)
+                            # AC: Images written in this path always have wrong frame num
+                            self.writeImage(self.tracks[i].images[k], px, py, prev_frame_num, str(self.tracks[i].track_id) + 'WRONG', pvel_mag, parea, pux, puy, pbWidth, pbHeight)
                             prev_frame_num += 1
-                            
+                    
                     ux, uy, bWidth, bHeight = self.tracks[i].boxes[-1]
                     speed = self.tracks[i].vel_prediction
                     vel_mag = np.sqrt(np.power(speed[0], 2) + np.power(speed[1], 2))
                     vel_mag = self.tracks[i].distances[-1]
+                    # AC: Images in this path sometimes have wrong frame num. frame num ahead of what is should be SOMETIMES. Seems to depend on when video processing is started.
                     self.writeImage(cropped_frame, x, y, frame_num, self.tracks[i].track_id, vel_mag, objArea, ux, uy, bWidth, bHeight)
 
             # only maintain history of a certain length
